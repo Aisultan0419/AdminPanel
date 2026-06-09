@@ -17,6 +17,7 @@ namespace UserManagement.Controllers
         }
 
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<object>>> RegisterUser([FromBody] RegisterUserDTO userDTO)
         {
             var result = await _userService.RegisterAsync(userDTO);
@@ -29,6 +30,7 @@ namespace UserManagement.Controllers
             return Ok(result);
         }
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<string>>> Login([FromBody] LoginUserDTO loginDTO)
         {
             var result = await _userService.LoginAsync(loginDTO);
