@@ -67,5 +67,20 @@ namespace UserManagement.Services
 
             return ApiResponse<string>.Ok(token, "Login successful.");
         }
+
+        public async Task<ApiResponse<List<GetUserDTO>>> GetAllUsersAsync()
+        {
+            var users = await _context.Users
+                .Select(u => new GetUserDTO(
+                    u.Id,
+                    u.Name,
+                    u.Email,
+                    u.Status.ToString(),
+                    u.LastActivityTime
+                ))
+                .ToListAsync();
+
+            return ApiResponse<List<GetUserDTO>>.Ok(users, "Users retrieved successfully.");
+        }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UserManagement.Domain;
 using UserManagement.DTO;
+using Microsoft.AspNetCore.Authorization;
 using UserManagement.Services;
 namespace UserManagement.Controllers
 {
@@ -37,6 +38,13 @@ namespace UserManagement.Controllers
                 return Unauthorized(result);
             }
 
+            return Ok(result);
+        }
+        [Authorize]
+        [HttpGet("all")]
+        public async Task<ActionResult<ApiResponse<List<GetUserDTO>>>> GetAllUsers()
+        {
+            var result = await _userService.GetAllUsersAsync();
             return Ok(result);
         }
     }
