@@ -21,10 +21,6 @@ namespace UserManagement.Services
         public async Task<ApiResponse<User>> RegisterAsync(RegisterUserDTO dto)
         {
             bool userExists = await _context.Users.AnyAsync(u => u.Email == dto.email);
-            if (userExists)
-            {
-                return ApiResponse<User>.Fail("A user with this email already exists.");
-            }
 
             var user = new User
             {
@@ -101,6 +97,23 @@ namespace UserManagement.Services
             await _context.SaveChangesAsync();
 
             return ApiResponse<string>.Ok(string.Empty, $"Successfully blocked {users.Count} users.");
+        }
+
+        public async Task<ApiResponse<string>> DeleteUsersAsync(List<Guid> userIds)
+        {
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToListAsync();
+
+            if (!users.Any())
+            {
+                return ApiResponse<string>.Fail("No matching users found.");
+            }
+
+            _context.Users.RemoveRange(users);
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<string>.Ok(string.Empty, $"Successfully deleted {users.Count} users.");
         }
     }
 }
