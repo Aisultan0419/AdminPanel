@@ -82,5 +82,25 @@ namespace UserManagement.Services
 
             return ApiResponse<List<GetUserDTO>>.Ok(users, "Users retrieved successfully.");
         }
+
+        public async Task<ApiResponse<string>> BlockUsersAsync(List<Guid> userIds)
+        {
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToListAsync();
+
+            if (!users.Any())
+            {
+                return ApiResponse<string>.Fail("No matching users found.");
+            }
+            foreach (var user in users)
+            {
+                user.Status = UserStatus.Blocked;
+                user.LastActivityTime = DateTime.UtcNow; 
+            }
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<string>.Ok(string.Empty, $"Successfully blocked {users.Count} users.");
+        }
     }
 }

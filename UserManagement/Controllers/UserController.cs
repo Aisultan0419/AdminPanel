@@ -47,5 +47,30 @@ namespace UserManagement.Controllers
             var result = await _userService.GetAllUsersAsync();
             return Ok(result);
         }
+        [Authorize]
+        [HttpPost("block")]
+        public async Task<ActionResult<ApiResponse<string>>> BlockUsers([FromBody] List<Guid> userIds)
+        {
+            if (userIds == null || !userIds.Any())
+            {
+                return BadRequest(ApiResponse<string>.Fail("No user IDs provided."));
+            }
+
+            var result = await _userService.BlockUsersAsync(userIds);
+            return Ok(result);
+        }
+
+        [Authorize]
+        [HttpPost("delete")]
+        public async Task<ActionResult<ApiResponse<string>>> DeleteUsers([FromBody] List<Guid> userIds)
+        {
+            if (userIds == null || !userIds.Any())
+            {
+                return BadRequest(ApiResponse<string>.Fail("No user IDs provided."));
+            }
+
+            var result = await _userService.DeleteUsersAsync(userIds);
+            return Ok(result);
+        }
     }
 }
