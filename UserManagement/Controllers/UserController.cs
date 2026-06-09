@@ -27,5 +27,17 @@ namespace UserManagement.Controllers
 
             return Ok(result);
         }
+        [HttpPost("login")]
+        public async Task<ActionResult<ApiResponse<string>>> Login([FromBody] LoginUserDTO loginDTO)
+        {
+            var result = await _userService.LoginAsync(loginDTO);
+
+            if (!result.Success)
+            {
+                return Unauthorized(result);
+            }
+
+            return Ok(result);
+        }
     }
 }

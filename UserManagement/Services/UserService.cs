@@ -10,11 +10,12 @@ namespace UserManagement.Services
     {
         private readonly AppDbContext _context;
         private readonly PasswordHasherService _passwordHasher;
-
-        public UserService(AppDbContext context, PasswordHasherService passwordHasher)
+        private readonly JwtService _jwtService;
+        public UserService(AppDbContext context, PasswordHasherService passwordHasher, JwtService jwtService)
         {
             _context = context;
             _passwordHasher = passwordHasher;
+            _jwtService = jwtService;
         }
 
         public async Task<ApiResponse<User>> RegisterAsync(RegisterUserDTO dto)
@@ -38,6 +39,33 @@ namespace UserManagement.Services
             await _context.SaveChangesAsync();
 
             return ApiResponse<User>.Ok(user, "The user has been successfully registered.");
+        }
+
+        public async Task<ApiResponse<string>> LoginAsync(LoginUserDTO dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.email);
+            if (user == null)
+            {
+                return ApiResponse<string>.Fail("Invalid email or password.");
+            }
+
+            if (user.Status == UserStatus.Blocked)
+            {
+                return ApiResponse<string>.Fail("Your account has been blocked. Access denied.");
+            }
+
+            bool isPasswordValid = _passwordHasher.VerifyPassword(dto.password, user.PasswordHash);
+            if (!isPasswordValid)
+            {
+                return ApiResponse<string>.Fail("Invalid email or password.");
+            }
+
+            user.LastActivityTime = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            string token = _jwtService.GenerateToken(user);
+
+            return ApiResponse<string>.Ok(token, "Login successful.");
         }
     }
 }
