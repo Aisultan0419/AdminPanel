@@ -93,6 +93,16 @@ namespace UserManagement.Controllers
             var result = await _userService.SendVerificationCodeAsync(clientEmail);
             return Ok(result);
         }
-
+        [Authorize]
+        [HttpPost("verify")]
+        public async Task<ActionResult<ApiResponse>> VerifyCode(string clientEmail, string code)
+        {
+            var result = await _userService.VerifyCodeAsync(clientEmail, code);
+            if (result.Success)
+            {
+                return Ok(result.Message);
+            }
+            return BadRequest(result.Message);
+        }
     }
 }

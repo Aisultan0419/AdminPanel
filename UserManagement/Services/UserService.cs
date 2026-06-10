@@ -1,8 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using StackExchange.Redis;
 using UserManagement.Domain;
 using UserManagement.DTO;
 using UserManagement.Infrastructure;
-using StackExchange.Redis;
 
 
 namespace UserManagement.Services
@@ -146,6 +147,24 @@ namespace UserManagement.Services
         private string GenerateVerificationCode()
         {
             return Random.Shared.Next(100000, 999999).ToString();
+        }
+
+        public async Task<ApiResponse> VerifyCodeAsync(string clientEmail, string code)
+        {
+            var redisKey = $"verification:{clientEmail}";
+            var value = await _redisDb.StringGetAsync(redisKey);
+
+            if (value.IsNullOrEmpty || value != code)
+            {
+                return ApiResponse.Fail("Verification code is invalid or expired");
+            }
+
+            await _redisDb.KeyDeleteAsync(redisKey);
+
+            var user = await _context.Users.FirstOrDefaultAsync(a => a.Email == clientEmail);
+            user!.Status = UserStatus.Active;
+            await _context.SaveChangesAsync();
+            return ApiResponse.Ok("User is successfully verified");
         }
     }
 }
