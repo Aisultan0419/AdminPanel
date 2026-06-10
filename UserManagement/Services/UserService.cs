@@ -2,6 +2,7 @@
 using UserManagement.Domain;
 using UserManagement.DTO;
 using UserManagement.Infrastructure;
+using StackExchange.Redis;
 
 
 namespace UserManagement.Services
@@ -11,11 +12,16 @@ namespace UserManagement.Services
         private readonly AppDbContext _context;
         private readonly PasswordHasherService _passwordHasher;
         private readonly JwtService _jwtService;
-        public UserService(AppDbContext context, PasswordHasherService passwordHasher, JwtService jwtService)
+        private readonly EmailService _emailService;
+        private readonly IDatabase _redisDb;
+
+        public UserService(AppDbContext context, PasswordHasherService passwordHasher, JwtService jwtService, EmailService emailService, IConnectionMultiplexer redis)
         {
             _context = context;
             _passwordHasher = passwordHasher;
             _jwtService = jwtService;
+            _emailService = emailService;
+            _redisDb = redis.GetDatabase();
         }
 
         public async Task<ApiResponse<string>> RegisterAsync(RegisterUserDTO dto)
@@ -124,6 +130,22 @@ namespace UserManagement.Services
             await _context.SaveChangesAsync();
 
             return ApiResponse<string>.Ok(string.Empty, $"Successfully deleted {unverifiedUsers.Count} unverified users.");
+        }
+
+        public async Task<ApiResponse<string>> SendVerificationCodeAsync(string clientEmail)
+        {
+            var code = GenerateVerificationCode();
+            await _emailService.SendVerificationEmailAsync(clientEmail, code);
+
+            var redisKey = $"verification:{clientEmail}";
+            await _redisDb.StringSetAsync(redisKey, code, TimeSpan.FromMinutes(5));
+
+            return ApiResponse<string>.Ok(string.Empty, "Verification code sent successfully.");
+        }
+
+        private string GenerateVerificationCode()
+        {
+            return Random.Shared.Next(100000, 999999).ToString();
         }
     }
 }

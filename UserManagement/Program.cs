@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using UserManagement.Extensions;
 using UserManagement.Infrastructure;
 using UserManagement.Middleware;
@@ -34,8 +35,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<PasswordHasherService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddJwtAuthentication(builder.Configuration);
-
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect("localhost:6379"));
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();

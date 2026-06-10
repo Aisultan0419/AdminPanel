@@ -3,6 +3,7 @@ using UserManagement.Domain;
 using UserManagement.DTO;
 using Microsoft.AspNetCore.Authorization;
 using UserManagement.Services;
+using UserManagement.Infrastructure;
 namespace UserManagement.Controllers
 {
     [Route("api/[controller]")]
@@ -10,10 +11,11 @@ namespace UserManagement.Controllers
     public class UserController : ControllerBase
     {
         private readonly UserService _userService;
-
-        public UserController(UserService userService)
+        EmailService _emailservice;
+        public UserController(UserService userService, EmailService emailservice)
         {
             _userService = userService;
+            _emailservice = emailservice;
         }
 
         [HttpPost("register")]
@@ -84,5 +86,13 @@ namespace UserManagement.Controllers
             var result = await _userService.DeleteUnverifiedUsersAsync();
             return Ok(result);
         }
+        [Authorize]
+        [HttpPost("send-verification")]
+        public async Task<ActionResult<ApiResponse<string>>> SendVerificationMessage(string clientEmail)
+        {
+            var result = await _userService.SendVerificationCodeAsync(clientEmail);
+            return Ok(result);
+        }
+
     }
 }
