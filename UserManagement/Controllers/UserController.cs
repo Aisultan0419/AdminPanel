@@ -76,5 +76,13 @@ namespace UserManagement.Controllers
             var result = await _userService.DeleteUsersAsync(userIds);
             return Ok(result);
         }
+
+        [Authorize]
+        [HttpPost("delete-unverified")]
+        public async Task<ActionResult<ApiResponse<string>>> DeleteUnverifiedUsers()
+        {
+            var result = await _userService.DeleteUnverifiedUsersAsync();
+            return Ok(result);
+        }
     }
 }

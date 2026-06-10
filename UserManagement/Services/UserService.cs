@@ -108,5 +108,22 @@ namespace UserManagement.Services
 
             return ApiResponse<string>.Ok(string.Empty, $"Successfully deleted {users.Count} users.");
         }
+
+        public async Task<ApiResponse<string>> DeleteUnverifiedUsersAsync()
+        {
+            var unverifiedUsers = await _context.Users
+                .Where(u => u.Status == UserStatus.Unverified)
+                .ToListAsync();
+
+            if (!unverifiedUsers.Any())
+            {
+                return ApiResponse<string>.Fail("No unverified users found.");
+            }
+
+            _context.Users.RemoveRange(unverifiedUsers);
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<string>.Ok(string.Empty, $"Successfully deleted {unverifiedUsers.Count} unverified users.");
+        }
     }
 }

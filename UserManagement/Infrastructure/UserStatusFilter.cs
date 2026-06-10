@@ -33,8 +33,6 @@ namespace UserManagement.Infrastructure
                 if (Guid.TryParse(userIdClaim, out Guid userId))
                 {
                     var user = await _context.Users
-                        .AsNoTracking()
-                        .Select(u => new { u.Id, u.IsBlocked })
                         .FirstOrDefaultAsync(u => u.Id == userId);
 
                     if (user == null || user.IsBlocked)
@@ -44,6 +42,8 @@ namespace UserManagement.Infrastructure
                         );
                         return;
                     }
+                    user.LastActivityTime = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
                 }
             }
 
