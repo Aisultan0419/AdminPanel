@@ -53,12 +53,14 @@ namespace UserManagement.Controllers
         [HttpPost("block")]
         public async Task<ActionResult<ApiResponse<string>>> BlockUsers([FromBody] List<Guid> userIds)
         {
-            if (userIds == null || !userIds.Any())
-            {
-                return BadRequest(ApiResponse<string>.Fail("No user IDs provided."));
-            }
-
-            var result = await _userService.BlockUsersAsync(userIds);
+            var result = await _userService.ChangeUsersStatusAsync(userIds, ModerationAction.Block);
+            return Ok(result);
+        }
+        [Authorize]
+        [HttpPost("unblock")]
+        public async Task<ActionResult<ApiResponse<string>>> UnblockUsers([FromBody] List<Guid> userIds)
+        {
+            var result = await _userService.ChangeUsersStatusAsync(userIds, ModerationAction.Unblock);
             return Ok(result);
         }
 

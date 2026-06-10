@@ -34,10 +34,10 @@ namespace UserManagement.Infrastructure
                 {
                     var user = await _context.Users
                         .AsNoTracking()
-                        .Select(u => new { u.Id, u.Status })
+                        .Select(u => new { u.Id, u.IsBlocked })
                         .FirstOrDefaultAsync(u => u.Id == userId);
 
-                    if (user == null || user.Status == UserStatus.Blocked)
+                    if (user == null || user.IsBlocked)
                     {
                         context.Result = new UnauthorizedObjectResult(
                             ApiResponse<object>.Fail("Your account is suspended or deleted. Access denied.")

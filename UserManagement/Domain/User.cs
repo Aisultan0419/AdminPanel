@@ -8,5 +8,6 @@
         public string PasswordHash { get; set; } = string.Empty;
         public UserStatus Status { get; set; } = UserStatus.Unverified;
         public DateTime? LastActivityTime { get; set; }
+        public bool IsBlocked { get; set; } = false;
     }
 }

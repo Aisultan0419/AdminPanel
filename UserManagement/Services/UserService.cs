@@ -18,10 +18,8 @@ namespace UserManagement.Services
             _jwtService = jwtService;
         }
 
-        public async Task<ApiResponse<User>> RegisterAsync(RegisterUserDTO dto)
+        public async Task<ApiResponse<string>> RegisterAsync(RegisterUserDTO dto)
         {
-            bool userExists = await _context.Users.AnyAsync(u => u.Email == dto.email);
-
             var user = new User
             {
                 Name = dto.name,
@@ -33,8 +31,7 @@ namespace UserManagement.Services
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-
-            return ApiResponse<User>.Ok(user, "The user has been successfully registered.");
+            return ApiResponse<string>.Ok(user.Id.ToString(), "The user has been successfully registered.");
         }
 
         public async Task<ApiResponse<string>> LoginAsync(LoginUserDTO dto)
@@ -45,7 +42,7 @@ namespace UserManagement.Services
                 return ApiResponse<string>.Fail("Invalid email or password.");
             }
 
-            if (user.Status == UserStatus.Blocked)
+            if (user.IsBlocked)
             {
                 return ApiResponse<string>.Fail("Your account has been blocked. Access denied.");
             }
@@ -72,31 +69,27 @@ namespace UserManagement.Services
                     u.Name,
                     u.Email,
                     u.Status.ToString(),
-                    u.LastActivityTime
+                    u.LastActivityTime,
+                    u.IsBlocked
                 ))
                 .ToListAsync();
 
             return ApiResponse<List<GetUserDTO>>.Ok(users, "Users retrieved successfully.");
         }
 
-        public async Task<ApiResponse<string>> BlockUsersAsync(List<Guid> userIds)
+        public async Task<ApiResponse<string>> ChangeUsersStatusAsync(List<Guid> userIds, ModerationAction action)
         {
-            var users = await _context.Users
-                .Where(u => userIds.Contains(u.Id))
-                .ToListAsync();
-
-            if (!users.Any())
-            {
-                return ApiResponse<string>.Fail("No matching users found.");
-            }
+            var users = await _context.Users.Where(u => userIds.Contains(u.Id)).ToListAsync();
+            if (!users.Any()) return ApiResponse<string>.Fail("No users found.");
+            bool isBlocked = action == ModerationAction.Block;
             foreach (var user in users)
             {
-                user.Status = UserStatus.Blocked;
-                user.LastActivityTime = DateTime.UtcNow; 
+                user.IsBlocked = isBlocked;
             }
-            await _context.SaveChangesAsync();
 
-            return ApiResponse<string>.Ok(string.Empty, $"Successfully blocked {users.Count} users.");
+            await _context.SaveChangesAsync();
+            string result = isBlocked ? "Users successfully are blocked" : "Users successfully are unblocked";
+            return ApiResponse<string>.Ok(string.Empty, result);
         }
 
         public async Task<ApiResponse<string>> DeleteUsersAsync(List<Guid> userIds)
