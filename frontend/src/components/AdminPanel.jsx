@@ -11,6 +11,33 @@ const AdminPanel = ({ token, onLogout }) => {
     fetchUsers();
   }, []);
 
+  const updateUserStatus = async (ids, actionPath) => {
+    try {
+      const response = await fetch(`https://localhost:7082/api/User/${actionPath}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(ids) 
+      });
+      
+      const result = await response.json();
+      
+      const errorMsg = await handleApiResponse(response);
+      if (errorMsg) {
+        setError(errorMsg);
+        if (response.status === 401) setTimeout(() => onLogout(), 2500);
+        return;
+      }
+      await fetchUsers();
+      setSelectedIds([]);
+
+    } catch (err) {
+      setError('Connection lost. Failed to block users. Please try again.');
+    }
+  };
+
   const fetchUsers = async () => {
     setIsLoading(true);
     setError('');
@@ -24,8 +51,10 @@ const AdminPanel = ({ token, onLogout }) => {
       
       const result = await response.json();
       
-      if (!response.ok || !result.success) {
-        setError(result.message || 'Failed to load user data. Please refresh the page.');
+      const errorMsg = await handleApiResponse(response);
+      if (errorMsg) {
+        setError(errorMsg);
+        if (response.status === 401) setTimeout(() => onLogout(), 2500);
         return;
       }
 
@@ -42,6 +71,30 @@ const AdminPanel = ({ token, onLogout }) => {
       setIsLoading(false);
     }
   };
+
+  const handleApiResponse = async (response) => {
+    if (response.status === 401) {
+      return 'Your session has expired. Please log in again.';
+    }
+
+    if (!response.ok) {
+      try {
+        const result = await response.json();
+        return result.Message || result.message || `Operation failed (Status ${response.status}).`;
+      } catch {
+        return `Server error: ${response.status} ${response.statusText}`;
+      }
+    }
+    try {
+      const result = await response.json();
+      if (result && result.success === false) {
+        return result.Message || result.message || 'Operation failed.';
+      }
+    } catch {
+    }
+    return null;
+  };
+
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -77,6 +130,13 @@ const AdminPanel = ({ token, onLogout }) => {
 
   const handleAction = (action) => {
     console.log(`Action: ${action}, Selected Users:`, selectedIds);
+    setError(''); 
+    if (action === 'block') {
+      updateUserStatus(selectedIds, 'block');
+    }
+    else if (action === 'unblock') {
+      updateUserStatus(selectedIds, 'unblock');
+    }
   };
 
   return (
