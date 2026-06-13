@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Table, Button, Form, Alert } from 'react-bootstrap';
+import { Container, Table, Button, Form, Alert, Modal } from 'react-bootstrap';
 
 const parseJwt = (token) => {
   try {
@@ -14,10 +14,32 @@ const AdminPanel = ({ token, onLogout }) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [timeLeft, setTimeLeft] = useState(300); 
+  const [verifyError, setVerifyError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    let timer;
+    if (showVerifyModal && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prevTime) => prevTime - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showVerifyModal, timeLeft]);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   const decodedToken = parseJwt(token);
   const currentUserId = decodedToken ? (decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] || decodedToken.id || decodedToken.sub) : null;
@@ -35,6 +57,76 @@ const AdminPanel = ({ token, onLogout }) => {
     const isCriticalAction = action === 'block' || action === 'delete';
     if (!affectedMyself || !isCriticalAction) {
       await fetchUsers();
+    }
+  };
+
+  const handleSendVerification = async () => {
+    const currentUser = users.find(u => u.id === currentUserId);
+    const email = currentUser?.email || decodedToken?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] || decodedToken?.email;
+
+    if (!email) {
+      setError('Unable to find your email address.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError('');
+
+    try {
+      const response = await fetch(`https://localhost:7082/api/User/send-verification?clientEmail=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const errorMsg = await handleApiResponse(response.clone());
+      if (errorMsg) {
+        setError(errorMsg);
+        setIsVerifying(false);
+        return;
+      }
+
+      setTimeLeft(300);
+      setVerificationCode('');
+      setVerifyError('');
+      setShowVerifyModal(true);
+    } catch (err) {
+      setError('Failed to send verification code. Please check your connection.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (verificationCode.length !== 6) {
+      setVerifyError('Code must be exactly 6 digits.');
+      return;
+    }
+
+    const currentUser = users.find(u => u.id === currentUserId);
+    const email = currentUser?.email || decodedToken?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] || decodedToken?.email;
+
+    setIsVerifying(true);
+    setVerifyError('');
+
+    try {
+      const response = await fetch(`https://localhost:7082/api/User/verify?clientEmail=${encodeURIComponent(email)}&code=${verificationCode}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const errorMsg = await handleApiResponse(response.clone());
+      if (errorMsg) {
+        // Выводим ошибку прямо внутри модального окна
+        setVerifyError(errorMsg);
+        setIsVerifying(false);
+        return;
+      }
+      setShowVerifyModal(false);
+      await fetchUsers();
+    } catch (err) {
+      setVerifyError('Failed to verify code. Please check your connection.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -216,7 +308,16 @@ const AdminPanel = ({ token, onLogout }) => {
     <Container className="py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2 className="mb-0">User Management</h2>
-        <Button variant="outline-secondary" onClick={onLogout}>Logout</Button>
+        <div className="d-flex gap-2">
+          <Button 
+            variant="outline-primary" 
+            onClick={handleSendVerification}
+            disabled={isVerifying}
+          >
+            {isVerifying && !showVerifyModal ? 'Sending...' : 'Verify account'}
+          </Button>
+          <Button variant="outline-secondary" onClick={onLogout}>Logout</Button>
+        </div>
       </div>
 
       {error && <Alert variant="danger" className="rounded-1">{error}</Alert>}
@@ -336,6 +437,57 @@ const AdminPanel = ({ token, onLogout }) => {
           </tbody>
         </Table>
       </div>
+      <Modal 
+        show={showVerifyModal} 
+        onHide={() => setShowVerifyModal(false)} 
+        centered
+        backdrop="static" 
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Account Verification</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center py-4">
+          <p className="text-muted mb-4">
+            We've sent a 6-digit code to your email. Please enter it below.
+          </p>
+          
+          <div className="d-flex justify-content-center mb-3">
+            <Form.Control
+              type="text"
+              placeholder="000000"
+              value={verificationCode}
+              onChange={(e) => {
+                const onlyNums = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setVerificationCode(onlyNums);
+              }}
+              style={{ width: '150px', fontSize: '1.5rem', textAlign: 'center', letterSpacing: '4px' }}
+              disabled={timeLeft === 0}
+              autoFocus
+            />
+          </div>
+
+          {verifyError && <Alert variant="danger" className="py-2">{verifyError}</Alert>}
+
+          <div className={`fs-5 fw-bold ${timeLeft < 60 ? 'text-danger' : 'text-primary'}`}>
+            {timeLeft > 0 ? formatTime(timeLeft) : 'Code expired'}
+          </div>
+          {timeLeft === 0 && (
+            <div className="text-muted small mt-2">
+              Please close this window and request a new code.
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="justify-content-center">
+          <Button 
+            variant="primary" 
+            onClick={handleVerifyCode}
+            disabled={verificationCode.length !== 6 || timeLeft === 0 || isVerifying}
+            className="w-50"
+          >
+            {isVerifying ? 'Verifying...' : 'Verify Code'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };
