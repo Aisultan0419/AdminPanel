@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Table, Button, Form, Alert, Modal } from 'react-bootstrap';
+import { Container, Table, Button, Form, Alert, Modal, OverlayTrigger, Tooltip } from 'react-bootstrap';
 
 const parseJwt = (token) => {
   try {
@@ -19,6 +19,7 @@ const AdminPanel = ({ token, onLogout }) => {
   const [timeLeft, setTimeLeft] = useState(300); 
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
 
   useEffect(() => {
@@ -34,6 +35,15 @@ const AdminPanel = ({ token, onLogout }) => {
     }
     return () => clearInterval(timer);
   }, [showVerifyModal, timeLeft]);
+
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => {
+        setSuccessMsg('');
+      }, 3000); 
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
@@ -78,12 +88,7 @@ const AdminPanel = ({ token, onLogout }) => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      const errorMsg = await handleApiResponse(response.clone());
-      if (errorMsg) {
-        setError(errorMsg);
-        setIsVerifying(false);
-        return;
-      }
+      if (await handleApiResponse(response.clone(), setError, setSuccessMsg)) return;
 
       setTimeLeft(300);
       setVerificationCode('');
@@ -114,13 +119,8 @@ const AdminPanel = ({ token, onLogout }) => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      const errorMsg = await handleApiResponse(response.clone());
-      if (errorMsg) {
-        // Выводим ошибку прямо внутри модального окна
-        setVerifyError(errorMsg);
-        setIsVerifying(false);
-        return;
-      }
+      if (await handleApiResponse(response.clone(), setVerifyError, setSuccessMsg)) return;
+      setVerifyError(''); 
       setShowVerifyModal(false);
       await fetchUsers();
     } catch (err) {
@@ -138,11 +138,7 @@ const AdminPanel = ({ token, onLogout }) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      const errorMsg = await handleApiResponse(response.clone(), true);
-      if (errorMsg) {
-        setError(errorMsg);
-        return;
-      }
+      if (await handleApiResponse(response.clone(), setError, setSuccessMsg)) return;
       const result = await response.json();
 
       await checkSelfAction(null, 'delete-unverified');
@@ -162,11 +158,7 @@ const AdminPanel = ({ token, onLogout }) => {
         },
         body: JSON.stringify(ids) 
       });
-      const errorMsg = await handleApiResponse(response.clone(), true);
-      if (errorMsg) {
-        setError(errorMsg);
-        return;
-      }
+      if (await handleApiResponse(response.clone(), setError, setSuccessMsg)) return;
       const result = await response.json();
       await checkSelfAction(ids, 'delete');
       setSelectedIds([]);
@@ -186,11 +178,7 @@ const AdminPanel = ({ token, onLogout }) => {
       body: JSON.stringify(ids) 
     });
 
-    const errorMsg = await handleApiResponse(response.clone(), onLogout);
-    if (errorMsg) {
-      setError(errorMsg);
-      return;
-    }
+    if (await handleApiResponse(response.clone(), setError, setSuccessMsg)) return;
     await checkSelfAction(ids, actionPath);
     setSelectedIds([]);
 
@@ -209,11 +197,7 @@ const AdminPanel = ({ token, onLogout }) => {
           'Authorization': `Bearer ${token}` 
         }
       });
-      const errorMsg = await handleApiResponse(response.clone(), true);
-      if (errorMsg) {
-        setError(errorMsg);
-        return;
-      }
+      if (await handleApiResponse(response.clone(), setError, null)) return;
 
       const result = await response.json();
       
@@ -231,7 +215,7 @@ const AdminPanel = ({ token, onLogout }) => {
     }
   };
 
-  const handleApiResponse = async (response, isFormData = false) => {
+  const handleApiResponse = async (response, setError, setSuccessMsg) => {
     if (response.status === 401) {
       onLogout(); 
       return 'Your session has expired or your account was deleted. Redirecting...';
@@ -249,6 +233,9 @@ const AdminPanel = ({ token, onLogout }) => {
       if (result && result.success === false) {
         return result.message || 'Operation failed.';
       }
+      if (result && result.message && setSuccessMsg) {
+      setSuccessMsg(result.message);
+    }
     } catch {
     }
     return null;
@@ -321,58 +308,82 @@ const AdminPanel = ({ token, onLogout }) => {
       </div>
 
       {error && <Alert variant="danger" className="rounded-1">{error}</Alert>}
-
+      {successMsg && <Alert variant="success" className="rounded-1">{successMsg}</Alert>}
       <div className="d-flex gap-2 mb-3">
-        <Button 
-          variant="outline-primary" 
-          className="d-flex align-items-center gap-2"
-          onClick={() => handleAction('block')}
-          disabled={selectedIds.length === 0}
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id="tooltip-block">Block selected users</Tooltip>}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-          Block
-        </Button>
+          <span>
+            <Button 
+              variant="outline-primary" 
+              className="d-flex align-items-center gap-2"
+              onClick={() => handleAction('block')}
+              disabled={selectedIds.length === 0}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              Block
+            </Button>
+          </span>
+        </OverlayTrigger>
 
-        <Button 
-          variant="outline-secondary" 
-          onClick={() => handleAction('unblock')}
-          disabled={selectedIds.length === 0}
-          title="Unblock"
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id="tooltip-unblock">Unblock selected users</Tooltip>}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-          </svg>
-        </Button>
+          <span className="d-inline-block">
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => handleAction('unblock')}
+              disabled={selectedIds.length === 0}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+              </svg>
+            </Button>
+          </span>
+        </OverlayTrigger>
 
-        <Button 
-          variant="outline-danger" 
-          onClick={() => handleAction('delete')}
-          disabled={selectedIds.length === 0}
-          title="Delete"
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id="tooltip-delete">Delete selected users</Tooltip>}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-        </Button>
+          <span className="d-inline-block">
+            <Button 
+              variant="outline-danger" 
+              onClick={() => handleAction('delete')}
+              disabled={selectedIds.length === 0}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </Button>
+          </span>
+        </OverlayTrigger>
 
-        <Button 
-          variant="outline-danger" 
-          onClick={() => handleAction('delete-unverified')}
-          title="Delete Unverified"
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip id="tooltip-delete-unverified">Delete all unverified users</Tooltip>}
         >
-
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="8.5" cy="7" r="4"></circle>
-            <line x1="18" y1="8" x2="23" y2="13"></line>
-            <line x1="23" y1="8" x2="18" y2="13"></line>
-          </svg>
-        </Button>
+          <span className="d-inline-block">
+            <Button 
+              variant="outline-danger" 
+              onClick={() => handleAction('delete-unverified')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <line x1="18" y1="8" x2="23" y2="13"></line>
+                <line x1="23" y1="8" x2="18" y2="13"></line>
+              </svg>
+            </Button>
+          </span>
+        </OverlayTrigger>
       </div>
 
       <div className="table-responsive border rounded bg-white shadow-sm">
