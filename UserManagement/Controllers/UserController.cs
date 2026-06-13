@@ -21,7 +21,14 @@ namespace UserManagement.Controllers
         public async Task<IActionResult> Login([FromBody] LoginUserDTO dto)
         {
             var result = await userService.LoginAsync(dto);
-            if (!result.Success) return Unauthorized(result);
+            if (!result.Success)
+            {
+                if (result.Message.Contains("blocked"))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, result);
+                }
+                return BadRequest(result);
+            }
             return Ok(result);
         }
 
@@ -88,9 +95,9 @@ namespace UserManagement.Controllers
             var result = await userService.VerifyCodeAsync(clientEmail, code);
             if (result.Success)
             {
-                return Ok(result.Message);
+                return Ok(result);
             }
-            return BadRequest(result.Message);
+            return BadRequest(result);
         }
     }
 }

@@ -20,6 +20,29 @@ const AuthPage = ({ onAuthSuccess }) => {
     setSuccessMsg('');
   };
 
+  const handleApiResponse = async (response) => {
+    if (response.status === 401) {
+      return 'Your session has expired. Please log in again.';
+    }
+
+    if (!response.ok) {
+      try {
+        const result = await response.json();
+        return result.message || `Operation failed (Status ${response.status}).`;
+      } catch {
+        return `Server error: ${response.status} ${response.statusText}`;
+      }
+    }
+    try {
+      const result = await response.json();
+      if (result && result.success === false) {
+        return result.message || 'Operation failed.';
+      }
+    } catch {
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -51,19 +74,19 @@ const AuthPage = ({ onAuthSuccess }) => {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-
-  
-      if (!response.ok || !data.success) {
-        setError(data.Message || 'An error occurred. Please try again.');
+      const errorMsg = await handleApiResponse(response.clone(), true);
+      if (errorMsg) {
+        setError(errorMsg);
         return;
       }
+
+      const data = await response.json();
 
       if (isLogin) {
         localStorage.setItem('jwt_token', data.data);
         if (onAuthSuccess) onAuthSuccess(data.data);
       } else {
-        setSuccessMsg(data.Message || 'Registration successful! You can now sign in.');
+        setSuccessMsg(data.message || 'Registration successful! You can now sign in.');
         setFormData({ name: '', email: '', password: '' });
         setIsLogin(true);
       }

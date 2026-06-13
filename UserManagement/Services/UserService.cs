@@ -37,7 +37,7 @@ namespace UserManagement.Services
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.email);
             if (user == null)
             {
-                return ApiResponse<string>.Fail("Invalid email or password.");
+                return ApiResponse<string>.Fail("User does not exists");
             }
 
             if (user.IsBlocked)

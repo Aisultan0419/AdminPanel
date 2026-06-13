@@ -27,7 +27,8 @@ namespace UserManagement.Middleware
                 context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
 
                 var response = ApiResponse<object>.Fail("This email is already registered.");
-                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+                var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
             }
             catch (Exception)
             {
@@ -35,7 +36,8 @@ namespace UserManagement.Middleware
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
                 var response = ApiResponse<object>.Fail("An unexpected error occurred.");
-                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+                var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
             }
         }
     }

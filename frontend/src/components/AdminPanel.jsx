@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Table, Button, Form, Alert } from 'react-bootstrap';
 
+const parseJwt = (token) => {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch (e) {
+    return null;
+  }
+};
+
 const AdminPanel = ({ token, onLogout }) => {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -11,9 +19,50 @@ const AdminPanel = ({ token, onLogout }) => {
     fetchUsers();
   }, []);
 
-  const updateUserStatus = async (ids, actionPath) => {
+  const decodedToken = parseJwt(token);
+  const currentUserId = decodedToken ? (decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] || decodedToken.id || decodedToken.sub) : null;
+
+  const checkSelfAction = async (ids, action) => {
+    const currentUser = users.find(u => u.id === currentUserId);
+    if (action === 'delete-unverified') {
+      if (currentUser && currentUser.status !== 'Active') {
+        return; 
+      }
+      await fetchUsers();
+      return;
+    }
+    const affectedMyself = ids && ids.includes(currentUserId);
+    const isCriticalAction = action === 'block' || action === 'delete';
+    if (!affectedMyself || !isCriticalAction) {
+      await fetchUsers();
+    }
+  };
+
+  const deleteUnverifiedUsers = async () => {
     try {
-      const response = await fetch(`https://localhost:7082/api/User/${actionPath}`, {
+      const response = await fetch('https://localhost:7082/api/User/delete-unverified', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const errorMsg = await handleApiResponse(response.clone(), true);
+      if (errorMsg) {
+        setError(errorMsg);
+        return;
+      }
+      const result = await response.json();
+
+      await checkSelfAction(null, 'delete-unverified');
+
+    } catch (err) {
+      setError('Connection lost. Failed to delete unverified users. Please try again.');
+    }
+  };
+
+  const deleteUsers = async (ids) => {
+    try {
+      const response = await fetch('https://localhost:7082/api/User/delete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -21,22 +70,42 @@ const AdminPanel = ({ token, onLogout }) => {
         },
         body: JSON.stringify(ids) 
       });
-      
-      const result = await response.json();
-      
-      const errorMsg = await handleApiResponse(response);
+      const errorMsg = await handleApiResponse(response.clone(), true);
       if (errorMsg) {
         setError(errorMsg);
-        if (response.status === 401) setTimeout(() => onLogout(), 2500);
         return;
       }
-      await fetchUsers();
+      const result = await response.json();
+      await checkSelfAction(ids, 'delete');
       setSelectedIds([]);
-
     } catch (err) {
-      setError('Connection lost. Failed to block users. Please try again.');
+      setError('Connection lost. Failed to delete users. Please try again.');
     }
-  };
+  }
+
+  const updateUserStatus = async (ids, actionPath) => {
+  try {
+    const response = await fetch(`https://localhost:7082/api/User/${actionPath}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(ids) 
+    });
+
+    const errorMsg = await handleApiResponse(response.clone(), onLogout);
+    if (errorMsg) {
+      setError(errorMsg);
+      return;
+    }
+    await checkSelfAction(ids, actionPath);
+    setSelectedIds([]);
+
+  } catch (err) {
+    setError('Connection lost. Failed to update user status. Please try again.');
+  }
+};
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -48,16 +117,14 @@ const AdminPanel = ({ token, onLogout }) => {
           'Authorization': `Bearer ${token}` 
         }
       });
-      
-      const result = await response.json();
-      
-      const errorMsg = await handleApiResponse(response);
+      const errorMsg = await handleApiResponse(response.clone(), true);
       if (errorMsg) {
         setError(errorMsg);
-        if (response.status === 401) setTimeout(() => onLogout(), 2500);
         return;
       }
 
+      const result = await response.json();
+      
       const sortedUsers = result.data.sort((a, b) => {
         const dateA = a.lastActivityTime ? new Date(a.lastActivityTime).getTime() : 0;
         const dateB = b.lastActivityTime ? new Date(b.lastActivityTime).getTime() : 0;
@@ -72,15 +139,15 @@ const AdminPanel = ({ token, onLogout }) => {
     }
   };
 
-  const handleApiResponse = async (response) => {
+  const handleApiResponse = async (response, isFormData = false) => {
     if (response.status === 401) {
-      return 'Your session has expired. Please log in again.';
+      onLogout(); 
+      return 'Your session has expired or your account was deleted. Redirecting...';
     }
-
     if (!response.ok) {
       try {
         const result = await response.json();
-        return result.Message || result.message || `Operation failed (Status ${response.status}).`;
+        return result.message || `Operation failed (Status ${response.status}).`;
       } catch {
         return `Server error: ${response.status} ${response.statusText}`;
       }
@@ -88,7 +155,7 @@ const AdminPanel = ({ token, onLogout }) => {
     try {
       const result = await response.json();
       if (result && result.success === false) {
-        return result.Message || result.message || 'Operation failed.';
+        return result.message || 'Operation failed.';
       }
     } catch {
     }
@@ -136,6 +203,12 @@ const AdminPanel = ({ token, onLogout }) => {
     }
     else if (action === 'unblock') {
       updateUserStatus(selectedIds, 'unblock');
+    }
+    else if (action === 'delete') {
+      deleteUsers(selectedIds);
+    }
+    else if (action === 'delete-unverified') {
+      deleteUnverifiedUsers();
     }
   };
 
