@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { Container, Row, Col, Form, Button, InputGroup, Alert, Spinner } from 'react-bootstrap';
 const getUniqIdValue = (prefix) => `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 const AuthPage = ({ onAuthSuccess }) => {
@@ -51,7 +52,7 @@ const AuthPage = ({ onAuthSuccess }) => {
 
   
     const endpoint = isLogin ? '/login' : '/register';
-    const url = `https://localhost:7082/api/User${endpoint}`;
+    const url = `${API_BASE_URL}${endpoint}`;
 
    
     const payload = isLogin 

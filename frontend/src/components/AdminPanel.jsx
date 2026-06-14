@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Table, Button, Form, Alert, Modal, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { API_BASE_URL } from '../config';
 
 const parseJwt = (token) => {
   try {
@@ -20,7 +21,6 @@ const AdminPanel = ({ token, onLogout }) => {
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-
 
   useEffect(() => {
     fetchUsers();
@@ -83,7 +83,7 @@ const AdminPanel = ({ token, onLogout }) => {
     setError('');
 
     try {
-      const response = await fetch(`https://localhost:7082/api/User/send-verification?clientEmail=${encodeURIComponent(email)}`, {
+      const response = await fetch(`${API_BASE_URL}/send-verification?clientEmail=${encodeURIComponent(email)}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -114,7 +114,7 @@ const AdminPanel = ({ token, onLogout }) => {
     setVerifyError('');
 
     try {
-      const response = await fetch(`https://localhost:7082/api/User/verify?clientEmail=${encodeURIComponent(email)}&code=${verificationCode}`, {
+      const response = await fetch(`${API_BASE_URL}/verify?clientEmail=${encodeURIComponent(email)}&code=${verificationCode}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -132,7 +132,7 @@ const AdminPanel = ({ token, onLogout }) => {
 
   const deleteUnverifiedUsers = async () => {
     try {
-      const response = await fetch('https://localhost:7082/api/User/delete-unverified', {
+      const response = await fetch(`${API_BASE_URL}/delete-unverified`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -150,7 +150,7 @@ const AdminPanel = ({ token, onLogout }) => {
 
   const deleteUsers = async (ids) => {
     try {
-      const response = await fetch('https://localhost:7082/api/User/delete', {
+      const response = await fetch(`${API_BASE_URL}/delete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -169,7 +169,7 @@ const AdminPanel = ({ token, onLogout }) => {
 
   const updateUserStatus = async (ids, actionPath) => {
   try {
-    const response = await fetch(`https://localhost:7082/api/User/${actionPath}`, {
+    const response = await fetch(`${API_BASE_URL}/${actionPath}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -192,7 +192,7 @@ const AdminPanel = ({ token, onLogout }) => {
     setError('');
     
     try {
-      const response = await fetch('https://localhost:7082/api/User/all', {
+      const response = await fetch(`${API_BASE_URL}/all`, {
         headers: {
           'Authorization': `Bearer ${token}` 
         }
